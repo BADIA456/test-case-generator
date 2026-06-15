@@ -1,0 +1,20 @@
+from groq import Groq
+from dotenv import load_dotenv
+import os
+
+# This line reads your .env file and loads the key into your program
+load_dotenv()
+
+# This fetches the key from the environment
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Send a simple test message to the AI
+response = client.chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[
+        {"role": "user", "content": "Say hello and tell me you are working correctly."}
+    ]
+)
+
+# Print the AI's reply
+print(response.choices[0].message.content)
