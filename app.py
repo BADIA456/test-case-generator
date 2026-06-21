@@ -10,7 +10,7 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# ---- Pydantic models (same as before) ----
+# ---- Pydantic models ----
 class TestCase(BaseModel):
     id: str
     requirement: str
@@ -23,7 +23,7 @@ class TestCase(BaseModel):
 class TestCaseList(BaseModel):
     test_cases: list[TestCase]
 
-# ---- PDF reader (same as before) ----
+# ---- PDF reader ----
 def extract_text_from_pdf(filename):
     text = ""
     reader = PyPDF2.PdfReader(filename)
@@ -35,7 +35,7 @@ def extract_text_from_pdf(filename):
         text = " ".join(words[:3000])
     return text
 
-# ---- AI generator (same as before) ----
+# ---- AI generator ----
 def generate_test_cases(document_text):
     prompt = f"""
     You are a software testing expert.
@@ -87,40 +87,136 @@ def generate_test_cases(document_text):
     result = TestCaseList(**data)
     return result
 
-# ---- Streamlit UI starts here ----
+# getting the priority for testcases with colours
+def get_priority_color(priority):
+    if priority == "High":
+        return ":red[HIGH]"
+    elif priority == "Medium":
+        return ":orange[MEDIUM]"
+    else:
+        return ":green[LOW]"
 
-# This sets the browser tab title and layout
+# ---- Streamlit UI ----
 st.set_page_config(page_title="Test Case Generator", layout="wide")
 
-# Main title on the page
 st.title("AI Test Case Generator")
 st.write("Upload a requirements document and let AI generate test cases for you.")
 
-# File uploader widget
+# ---- File uploader ----
 uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
 
-# Generate button
 if uploaded_file is not None:
     st.success("File uploaded successfully!")
     
     if st.button("Generate Test Cases"):
-        # Show a spinner while AI is thinking
         with st.spinner("Reading document and generating test cases..."):
             document_text = extract_text_from_pdf(uploaded_file)
             result = generate_test_cases(document_text)
             
-            # Save results to session state so they persist on the page
-            st.session_state.test_cases = result.test_cases
+            # Save test cases to session state
+            # Each test case also gets a "status" — starts as Todo
+            st.session_state.test_cases = [
+                {
+                    "id": tc.id,
+                    "requirement": tc.requirement,
+                    "description": tc.description,
+                    "precondition": tc.precondition,
+                    "steps": tc.steps,
+                    "expected_result": tc.expected_result,
+                    "priority": tc.priority,
+                    "status": "Todo"  # This is new — tracks which column the card is in
+                }
+                for tc in result.test_cases
+            ]
 
-# Display results if they exist
+# ---- Kanban Board ----
 if "test_cases" in st.session_state:
-    st.subheader("Generated Test Cases")
+    st.divider()
+    st.subheader("Test Case Kanban Board")
     
-    for tc in st.session_state.test_cases:
-        # Each test case gets its own expandable box
-        with st.expander(f"{tc.id} — {tc.description}"):
-            st.write(f"**Requirement:** {tc.requirement}")
-            st.write(f"**Precondition:** {tc.precondition}")
-            st.write(f"**Steps:** {tc.steps}")
-            st.write(f"**Expected Result:** {tc.expected_result}")
-            st.write(f"**Priority:** {tc.priority}")
+    # Create 3 columns
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("###  To Do")
+        st.caption("Test cases not yet executed")
+        
+        for i, tc in enumerate(st.session_state.test_cases):
+            if tc["status"] == "Todo":
+                with st.container(border=True):
+                    st.markdown(f"**{tc['id']}** {get_priority_color(tc['priority'])}")
+                    st.write(tc["description"])
+                    
+                    with st.expander("View details"):
+                        st.write(f"**Requirement:** {tc['requirement']}")
+                        st.write(f"**Precondition:** {tc['precondition']}")
+                        st.write(f"**Steps:** {tc['steps']}")
+                        st.write(f"**Expected Result:** {tc['expected_result']}")
+                        st.write(f"**Priority:** {tc['priority']}")
+                    
+                    # Two buttons side by side
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("Pass", key=f"pass_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Passed"
+                            st.rerun()
+                    with b2:
+                        if st.button("Fail", key=f"fail_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Failed"
+                            st.rerun()
+
+    with col2:
+        st.markdown("###  Passed")
+        st.caption("Test cases that passed")
+        
+        for i, tc in enumerate(st.session_state.test_cases):
+            if tc["status"] == "Passed":
+                with st.container(border=True):
+                    st.markdown(f"**{tc['id']}** {get_priority_color(tc['priority'])}")
+                    st.write(tc["description"])
+                    
+                    with st.expander("View details"):
+                        st.write(f"**Requirement:** {tc['requirement']}")
+                        st.write(f"**Precondition:** {tc['precondition']}")
+                        st.write(f"**Steps:** {tc['steps']}")
+                        st.write(f"**Expected Result:** {tc['expected_result']}")
+                        st.write(f"**Priority:** {tc['priority']}")
+                    
+                    # Allow moving back to Todo or to Failed
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("Reset", key=f"reset_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Todo"
+                            st.rerun()
+                    with b2:
+                        if st.button("Fail", key=f"fail2_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Failed"
+                            st.rerun()
+
+    with col3:
+        st.markdown("###  Failed")
+        st.caption("Test cases that failed")
+        
+        for i, tc in enumerate(st.session_state.test_cases):
+            if tc["status"] == "Failed":
+                with st.container(border=True):
+                    st.markdown(f"**{tc['id']}** {get_priority_color(tc['priority'])}")
+                    st.write(tc["description"])
+                    
+                    with st.expander("View details"):
+                        st.write(f"**Requirement:** {tc['requirement']}")
+                        st.write(f"**Precondition:** {tc['precondition']}")
+                        st.write(f"**Steps:** {tc['steps']}")
+                        st.write(f"**Expected Result:** {tc['expected_result']}")
+                        st.write(f"**Priority:** {tc['priority']}")
+                    
+                    # Allow moving back to Todo or to Passed
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("Reset", key=f"reset2_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Todo"
+                            st.rerun()
+                    with b2:
+                        if st.button("Pass", key=f"pass2_{i}"):
+                            st.session_state.test_cases[i]["status"] = "Passed"
+                            st.rerun()
