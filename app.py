@@ -10,7 +10,7 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# ---- Pydantic models ----
+# Pydantic models
 class TestCase(BaseModel):
     id: str
     requirement: str
@@ -23,7 +23,7 @@ class TestCase(BaseModel):
 class TestCaseList(BaseModel):
     test_cases: list[TestCase]
 
-# ---- PDF reader ----
+# PDF reader (my eyes are burning nowwwww)
 def extract_text_from_pdf(filename):
     text = ""
     reader = PyPDF2.PdfReader(filename)
@@ -35,7 +35,7 @@ def extract_text_from_pdf(filename):
         text = " ".join(words[:3000])
     return text
 
-# ---- AI generator ----
+# AI generator 
 def generate_test_cases(document_text):
     prompt = f"""
     You are a software testing expert.
@@ -96,13 +96,13 @@ def get_priority_color(priority):
     else:
         return ":green[LOW]"
 
-# ---- Streamlit UI ----
+#  Streamlit UI -everything looks pretty now
 st.set_page_config(page_title="Test Case Generator", layout="wide")
 
 st.title("AI Test Case Generator")
 st.write("Upload a requirements document and let AI generate test cases for you.")
 
-# ---- File uploader ----
+# File uploader 
 uploaded_file = st.file_uploader("Upload your PDF", type=["pdf"])
 
 if uploaded_file is not None:
@@ -124,17 +124,17 @@ if uploaded_file is not None:
                     "steps": tc.steps,
                     "expected_result": tc.expected_result,
                     "priority": tc.priority,
-                    "status": "Todo"  # This is new — tracks which column the card is in
+                    "status": "Todo"  # this thing tracks which column the card is in
                 }
                 for tc in result.test_cases
             ]
 
-# ---- Kanban Board ----
+# Kanban Board
 if "test_cases" in st.session_state:
     st.divider()
     st.subheader("Test Case Kanban Board")
     
-    # Create 3 columns
+    # Creating 3 columns
     col1, col2, col3 = st.columns(3)
 
     with col1:
