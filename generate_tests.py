@@ -9,7 +9,7 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# This is Pydantic - we're defining exactly what one test case looks like
+# defining exactly what one test case looks like
 class TestCase(BaseModel):
     id: str
     requirement: str
@@ -77,8 +77,7 @@ def generate_test_cases(document_text):
     
     raw = response.choices[0].message.content
 
-    # Sometimes AI returns markdown code blocks like ```json ... ```
-    # This strips that out if present
+    #strip out markdown code blocks like ```json ... ``` if AI returns something like that
     if "```json" in raw:
         raw = raw.split("```json")[1].split("```")[0].strip()
     elif "```" in raw:
